@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Ruleta Lineal 5 · Bonificación probabilística</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']], processEscapes: true },
+      chtml: { scale: 1.05, mtextInheritFont: true },
+      options: { renderActions: { addMenu: [] } }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+  <div id="clock" class="clock">00:00:00</div>
+  <section id="lockScreen" class="screen active lock-screen">
+    <div class="hero-card">
+      <div class="brand">LINEAL5</div>
+      <h1>Ruleta Lineal 5<br><span>Nota 1.0 · Pantalla completa · Seguridad docente</span></h1>
+      <p>Valores propios, diagonalización, rototraslación, Jordan, valores complejos y ejes principales con preguntas en LaTeX de alta calidad.</p>
+      <input id="password" type="password" placeholder="Contraseña de inicio" autocomplete="off" />
+      <button id="unlockBtn">Ingresar en pantalla completa</button>
+      <button id="howToPlayBtn" class="secondary-btn" type="button">Cómo jugar</button>
+      <p class="full-note">Desde este punto la actividad debe permanecer en pantalla completa.</p>
+      <small id="lockError"></small>
+    </div>
+  </section>
+
+  <section id="setupScreen" class="screen setup-screen">
+    <div class="setup-card">
+      <h2>Configuración de la partida</h2>
+      <label>Nombre del estudiante</label>
+      <input id="studentName" placeholder="Nombre completo" />
+      <div class="rules-box">
+        <b>Reglas de puntuación</b>
+        <p>La partida inicia con <b>nota 1.0</b>. La meta es llegar a <b>5.0</b>. Antes de girar, el estudiante debe abrir el cuadro de apuesta académica, elegir una ficha de ruleta y escoger cuántas décimas desea arriesgar. <b>No hay nota mínima de permanencia:</b> si después de una pérdida la nota llega a cero, o queda por debajo de una décima disponible para jugar, el quiz termina con <b>0.0</b>.</p>
+        <p>Si la balota cae en el tipo de ficha elegido, gana una <b>bonificación variable</b> calculada con \(B=1-P\), donde \(P\) es la probabilidad de acertar ese tipo de apuesta. Además, si responde bien la pregunta, gana <b>el doble de las décimas arriesgadas</b>. Si responde mal, pierde únicamente <b>la mitad</b> de lo arriesgado.</p>
+        <p>La dificultad depende de la apuesta: <b>0.1 = Básico</b>, <b>0.2 = Intermedio</b>, <b>0.3 a 0.5 = Avanzado</b>, <b>0.7 a 1.0 = Experto</b>.</p>
+      </div>
+      <button id="startBtn">Iniciar partida</button>
+    </div>
+  </section>
+
+  <main id="gameScreen" class="game hidden">
+    <header class="topbar">
+      <div><b>Ruleta Lineal 5</b><span>Nota 1.0 · Bonificación probabilística</span></div>
+      <div class="stat"><span>Nota</span><b id="scoreText">1.0/5.0</b></div>
+      <div class="stat"><span>Tiempo</span><b id="timeText">60:00</b></div>
+      <button id="finishBtn" class="danger">Finalizar</button>
+    </header>
+
+    <section class="table-grid">
+      <div class="roulette-panel">
+        <div class="roulette-table">
+          <div class="zero-cell">0</div>
+          <div id="numberGrid" class="number-grid"></div>
+        </div>
+        <div class="outer-bets"><span>1st 12</span><span>2nd 12</span><span>3rd 12</span><span>Rojo</span><span>Negro</span><span>Verde 0</span></div>
+        <div class="wheel-wrap">
+          <div id="wheel" class="wheel"><div id="wheelNumbers" class="wheel-numbers"></div><div id="ball" class="ball"></div><div class="hub">λ</div></div>
+          <div class="pointer">▼</div>
+        </div>
+      </div>
+
+      <aside class="side-panel">
+        <h2>Antes de girar</h2>
+        <p><b>1.</b> Abre el cuadro de apuesta académica. <b>2.</b> Elige la ficha de ruleta y las décimas. <b>3.</b> Gira la ruleta. El nivel de la pregunta depende del valor elegido.</p>
+        <button id="openBetBtn" class="bet-dialog-btn">Nueva apuesta académica</button>
+        <div class="current-bet-card current-bet-live" aria-live="polite">
+          <div class="card-title">Apuesta actual antes del giro</div>
+          <span>Ficha elegida</span><b id="currentRouteText">--</b>
+          <span>Décimas arriesgadas</span><b id="currentRiskText">--</b>
+          <span>Nivel de pregunta</span><b id="currentLevelText">--</b>
+          <span>Regla activa</span><b id="currentBetRule">Configura la apuesta</b>
+        </div>
+        <button id="spinBtn" class="spin-btn" disabled>Girar ruleta</button>
+        <div class="last-card last-ball-live" aria-live="polite">
+          <div class="card-title">Resultado de la última balota lanzada</div>
+          <span>Última balota</span><b id="lastBall">--</b>
+          <span>Color</span><b id="lastColor">--</b>
+          <span>Nivel</span><b id="lastLevel">--</b>
+          <span>Ficha elegida</span><b id="lastRoute">--</b>
+          <span>Resultado</span><b id="lastResult">Pendiente</b>
+          <span>Movimiento total</span><b id="lastDelta">--</b>
+        </div>
+        <div id="log" class="log">Selecciona una ficha, elige décimas y gira la ruleta.</div>
+      </aside>
+    </section>
+  </main>
+
+  <div id="betModal" class="modal bet-modal hidden">
+    <div class="bet-card">
+      <div class="question-head"><span>Apuesta académica de la ronda</span><button id="closeBet" class="ghost">×</button></div>
+      <h2>Elige ficha y décimas antes de girar</h2>
+      <p class="bet-intro">La pregunta cambia de nivel según las décimas elegidas. Si la balota cae en tu ficha, ganas una bonificación \(B(A)=1-P(A)\), donde \(P\) depende del tipo elegido; luego la pregunta puede sumar el doble de lo arriesgado o restar la mitad.</p>
+      <div class="bet-modal-grid">
+        <section>
+          <div class="panel-label">Ficha de ruleta</div>
+          <div id="routeButtons" class="route-buttons modal-routes"></div>
+          <div id="routeInfo" class="route-info">Selecciona primero una ficha de la ruleta.</div>
+        </section>
+        <section>
+          <div class="panel-label">Décimas académicas</div>
+          <div id="riskButtons" class="risk-buttons modal-risks"></div>
+          <div id="riskInfo" class="risk-info"></div>
+        </section>
+      </div>
+      <div class="level-scale">
+        <span><b>0.1</b> Básico</span>
+        <span><b>0.2</b> Intermedio</span>
+        <span><b>0.3–0.5</b> Avanzado</span>
+        <span><b>0.7–1.0</b> Experto</span>
+      </div>
+      <div class="bet-formula">Fórmula de ronda: bono por coincidencia <b>\(B(A)=1-P(A)\)</b> · respuesta correcta <b>+2×décimas</b> · respuesta incorrecta <b>−0.5×décimas</b>.</div>
+      <div id="betPreview" class="bet-preview" aria-live="polite">Apuesta actual: elige ficha y décimas para activar el giro.</div>
+      <div id="betError" class="bet-error hidden" role="status" aria-live="polite"></div>
+      <button id="confirmBet" class="submit">Guardar apuesta y volver a la mesa</button>
+    </div>
+  </div>
+
+  <div id="questionModal" class="modal hidden">
+    <div class="question-card">
+      <div class="question-head"><span id="qMeta"></span><button id="closeQuestion" class="ghost">×</button></div>
+      <h2 id="qTitle"></h2>
+      <div id="qPrompt" class="prompt"></div>
+      <div id="qAnswerArea"></div>
+      <button id="submitAnswer" class="submit">Responder</button>
+      <div id="feedback" class="feedback hidden"></div>
+      <button id="continueBtn" class="continue hidden">Continuar</button>
+    </div>
+  </div>
+
+  <div id="blocker" class="blocker hidden">
+    <div class="security-card">
+      <div class="window-clock">Hora actual: <span class="clockCopy">--</span></div>
+      <h2>Bloqueo de seguridad</h2>
+      <p id="blockReason">La actividad detectó una salida de pantalla completa o una acción no permitida.</p>
+      <p class="teacher-only">Solo el docente puede desbloquear con la clave dinámica. Advertencia: al completar 5 infracciones el quiz se anula con nota 0.0.</p>
+      <input id="blockPass" type="password" placeholder="****" autocomplete="off" inputmode="numeric" />
+      <button id="unlockBlock">Desbloquear y volver a pantalla completa</button>
+      <small id="blockError"></small>
+    </div>
+  </div>
+
+  <div id="teacherModal" class="modal teacher-modal hidden">
+    <div class="teacher-card">
+      <div class="window-clock">Hora actual: <span class="clockCopy">--</span></div>
+      <div class="question-head"><span>Validación docente</span><button id="cancelTeacher" class="ghost">×</button></div>
+      <h2>Clave docente requerida</h2>
+      <p>Para finalizar o salir de la pantalla completa, el docente debe ingresar la clave dinámica.</p>
+      <input id="teacherPass" type="password" placeholder="****" autocomplete="off" inputmode="numeric" />
+      <button id="confirmTeacher" class="submit">Autorizar salida</button>
+      <small id="teacherError"></small>
+    </div>
+  </div>
+
+  <div id="howToPlayModal" class="modal how-modal hidden">
+    <div class="how-card">
+      <div class="question-head"><span>Cómo jugar Ruleta Lineal 5</span><button id="closeHowToPlay" class="ghost">×</button></div>
+      <h2>Guía rápida de la partida</h2>
+      <div class="how-steps">
+        <article><b>1. Ingresa</b><p>La clave de inicio es <b>LINEAL5</b>. Al entrar, el juego activa pantalla completa.</p></article>
+        <article><b>2. Configura la ronda</b><p>Antes de cada giro abre la apuesta académica. Elige una ficha: rojo, negro, verde, par, impar, rango o docena.</p></article>
+        <article><b>3. Elige décimas</b><p>Selecciona cuántas décimas arriesgar. Esa elección define el nivel: Básico, Intermedio, Avanzado o Experto.</p></article>
+        <article><b>4. Gira la ruleta</b><p>Primero gira la ruleta y después cae la pelota. Si la balota coincide con tu ficha, ganas una bonificación <b>\(B(A)=1-P(A)\)</b>.</p></article>
+        
+        <article class="probability-guide latex-guide"><b>Probabilidad y bonificación por tipo de apuesta</b>
+          <p>
+            La ruleta europea del juego tiene \(37\) casillas equiprobables:
+            \[
+              \Omega=\{0,1,2,\ldots,36\},\qquad |\Omega|=37.
+            \]
+            Si eliges un tipo de apuesta académica \(A\subseteq \Omega\), entonces la probabilidad de acertarla es
+            \[
+              P(A)=\frac{|A|}{37}.
+            \]
+          </p>
+
+          <div class="latex-box">
+            <div class="latex-title">Regla de bonificación probabilística</div>
+            \[
+              \boxed{\,B(A)=1-P(A)\,}
+              \qquad\text{con}\qquad
+              P(A)=\frac{|A|}{37}.
+            \]
+            <p>
+              La bonificación aumenta cuando la apuesta es menos probable. Por eso, una apuesta frecuente como rojo o negro da un bono menor,
+              mientras que acertar el verde \(0\) da el bono más alto.
+            </p>
+          </div>
+
+          <div class="prob-table-wrap">
+            <table class="prob-table">
+              <thead>
+                <tr>
+                  <th>Tipo de apuesta</th>
+                  <th>Conjunto \(A\)</th>
+                  <th>Probabilidad</th>
+                  <th>Bonificación si acierta</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Rojo, negro, par, impar, \(1\text{–}18\) o \(19\text{–}36\)</td>
+                  <td>\(|A|=18\)</td>
+                  <td>\[P(A)=\frac{18}{37}\approx 0.4865\]</td>
+                  <td>\[B(A)=1-\frac{18}{37}=\frac{19}{37}\approx 0.51\]</td>
+                </tr>
+                <tr>
+                  <td>Una docena</td>
+                  <td>\(|A|=12\)</td>
+                  <td>\[P(A)=\frac{12}{37}\approx 0.3243\]</td>
+                  <td>\[B(A)=1-\frac{12}{37}=\frac{25}{37}\approx 0.68\]</td>
+                </tr>
+                <tr>
+                  <td>Verde \(0\)</td>
+                  <td>\(|A|=1\)</td>
+                  <td>\[P(A)=\frac{1}{37}\approx 0.0270\]</td>
+                  <td>\[B(A)=1-\frac{1}{37}=\frac{36}{37}\approx 0.97\]</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="latex-example">
+            <div class="latex-title">Ejemplo de ronda</div>
+            <p>Supón que eliges una docena, arriesgas \(d=0.4\) décimas y la balota cae en esa docena.</p>
+            <p>Primero recibes el bono de ruleta:</p>
+            \[
+              B=\frac{25}{37}\approx 0.68.
+            \]
+            <p>Si además respondes correctamente la pregunta, el movimiento total de la ronda es</p>
+            \[
+              \Delta=\underbrace{\frac{25}{37}}_{\text{bono por ruleta}}
+              +\underbrace{2(0.4)}_{\text{respuesta correcta}}
+              \approx 0.68+0.80=1.48.
+            \]
+            <p>Si la respuesta es incorrecta, se conserva el bono por acertar la ficha, pero se descuenta la mitad de lo arriesgado:</p>
+            \[
+              \Delta=\underbrace{\frac{25}{37}}_{\text{bono por ruleta}}
+              -\underbrace{\frac{0.4}{2}}_{\text{error en la pregunta}}
+              \approx 0.68-0.20=0.48.
+            \]
+          </div>
+        </article>
+        <article><b>5. Responde</b><p>Si aciertas la pregunta, ganas <b>2 veces</b> lo arriesgado. Si fallas, pierdes solo <b>la mitad</b>.</p></article>
+        <article><b>6. Seguridad</b><p>No se permite salir de pantalla completa, pantallazos, clic derecho ni atajos restringidos. A la quinta infracción el quiz se anula con nota 0.0.</p></article>
+      </div>
+      <button id="closeHowToPlay2" class="submit">Entendido</button>
+    </div>
+  </div>
+
+  <script src="questions.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
